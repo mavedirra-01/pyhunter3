@@ -1,2 +1,3 @@
 # pyhunter3
-Web testing and bug-bounty framework
+
+For detailed documentation please see the wiki here: __fixme__

@@ -1,0 +1,17 @@
+title: Rusty Token
+baseurl: "/rusty_token"
+permalink: pretty
+markdown: kramdown
+theme: just-the-docs
+
+# Plugins
+plugins:
+  - jekyll-feed
+
+
+just_the_docs:
+  aux_links:
+    "Source on GitHub": "https://github.com/fancyc-bsi/rusty_token"
+  search_enabled: true
+  search_label: 'Search the docs...'
+  theme: dark
