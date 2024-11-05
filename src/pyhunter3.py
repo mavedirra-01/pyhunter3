@@ -331,7 +331,7 @@ class ReportGenerator:
         results = self._load_module_results(logs_dir, module_status)
         
         if not results:
-            return "# WebTest Report\nNo module results found."
+            return "# Pyhunter Report\nNo module results found."
         
         # Calculate summary statistics
         total_modules = len(results)
@@ -339,7 +339,7 @@ class ReportGenerator:
         failed_modules = total_modules - successful_modules
         
         markdown_content = f"""
-# WebTest Report
+# Pyhunter Report
 Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## Test Summary
@@ -388,7 +388,7 @@ Log File: {result.log_file}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebTest Report</title>
+    <title>Pyhunter Report</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/inter-ui/3.19.3/inter.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fira-code/6.2.0/fira_code.min.css">
     <style>
@@ -411,7 +411,7 @@ Log File: {result.log_file}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebTest Report</title>
+    <title>Pyhunter Report</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/inter-ui/3.19.3/inter.min.css">
     <style>
         {self.css}
@@ -582,7 +582,7 @@ class WebTestConsole(cmd.Cmd):
 {Fore.CYAN}Web Testing Framework{Style.RESET_ALL}
 Type 'help' or '?' to list commands.
 '''
-    prompt = f'{Fore.GREEN}webtest{Style.RESET_ALL}> '
+    prompt = f'{Fore.GREEN}pyhunter{Style.RESET_ALL}> '
 
     def __init__(self):
         super().__init__()
@@ -683,7 +683,7 @@ Type 'help' or '?' to list commands.
 
     def load_modules(self):
         """Dynamically load Go modules from the modules directory"""
-        modules_dir = os.path.expanduser("~/.webtest/modules")
+        modules_dir = os.path.expanduser(MOD_DIR)
         if not os.path.exists(modules_dir):
             os.makedirs(modules_dir)
 
@@ -1135,9 +1135,9 @@ Type 'help' or '?' to list commands.
             remote_info = ""
             
         if self.current_module:
-            self.prompt = f"{Fore.GREEN}webtest{remote_info}({self.current_module.name}){Style.RESET_ALL}> "
+            self.prompt = f"{Fore.GREEN}pyhunter{remote_info}({self.current_module.name}){Style.RESET_ALL}> "
         else:
-            self.prompt = f"{Fore.GREEN}webtest{remote_info}{Style.RESET_ALL}> "
+            self.prompt = f"{Fore.GREEN}pyhunter{remote_info}{Style.RESET_ALL}> "
 
     def do_exit(self, arg: str):
         """Exit the application"""
@@ -1153,40 +1153,69 @@ class ModuleDownloader:
         self.github_repo = github_repo
         self.local_dir = Path(local_dir)
         self.base_url = f'https://api.github.com/repos/{github_repo}/contents/modules'
+        self.hash_file = self.local_dir / '.module_hashes.json'
 
     def download_modules(self):
-        """Download all .go files from the GitHub modules directory to the local directory."""
-        self.local_dir.mkdir(parents=True, exist_ok=True)  # Create local directory if it doesn't exist
-        self._download_from_github(self.base_url)
+        """Download only new or updated .go files from the GitHub modules directory to the local directory."""
+        self.local_dir.mkdir(parents=True, exist_ok=True) 
 
-    def _download_from_github(self, url: str):
-        """Recursively download .go files from the specified GitHub URL."""
+        # Load previous hashes
+        previous_hashes = self._load_hashes()
+        new_hashes = {}
+
+        # Download modules and get updated hashes
+        self._download_from_github(self.base_url, previous_hashes, new_hashes)
+
+        # Save updated hashes
+        self._save_hashes(new_hashes)
+
+    def _download_from_github(self, url: str, previous_hashes: dict, new_hashes: dict):
+        """Recursively download updated .go files from the specified GitHub URL."""
         response = requests.get(url)
-        response.raise_for_status()  # Raise an error for bad responses
+        response.raise_for_status()
 
         for item in response.json():
             if item['type'] == 'file' and item['name'].endswith('.go'):
-                self._download_file(item['download_url'], item['name'])
+                file_sha = item['sha']
+                file_path = self.local_dir / item['name']
+
+                # Check if the file is new or has been updated
+                if previous_hashes.get(item['name']) != file_sha:
+                    self._download_file(item['download_url'], file_path)
+                    print(f'Downloaded {item["name"]} to {file_path}')
+
+                # Update new_hashes dictionary
+                new_hashes[item['name']] = file_sha
+
             elif item['type'] == 'dir':
                 # Recursively download files from the directory
                 sub_dir_url = item['url']
-                self._download_from_github(sub_dir_url)
+                self._download_from_github(sub_dir_url, previous_hashes, new_hashes)
 
-    def _download_file(self, file_url: str, filename: str):
-        """Download a single file and save it to the local directory."""
-        local_file_path = self.local_dir / filename
-        print(f'Downloading {filename} to {local_file_path}')
-        
+    def _download_file(self, file_url: str, file_path: Path):
+        """Download a single file and save it to the specified path."""
         file_response = requests.get(file_url)
-        file_response.raise_for_status()  # Raise an error for bad responses
+        file_response.raise_for_status()
 
-        with open(local_file_path, 'wb') as f:
+        with open(file_path, 'wb') as f:
             f.write(file_response.content)
+
+    def _load_hashes(self) -> dict:
+        """Load the previous file hashes from the local hash file."""
+        if self.hash_file.exists():
+            with open(self.hash_file, 'r') as f:
+                return json.load(f)
+        return {}
+
+    def _save_hashes(self, hashes: dict):
+        """Save the current file hashes to the local hash file."""
+        with open(self.hash_file, 'w') as f:
+            json.dump(hashes, f, indent=4)
 
 
 def main():
     github_repo = 'mavedirra-01/pyhunter3' 
-    home_dir = Path.home() / '.pyhunter3/modules'
+    home_dir = Path.home() / MOD_DIR
 
     downloader = ModuleDownloader(github_repo, home_dir)
     downloader.download_modules()
@@ -1195,4 +1224,7 @@ def main():
     WebTestConsole().cmdloop()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}Exiting...{Style.RESET_ALL}")

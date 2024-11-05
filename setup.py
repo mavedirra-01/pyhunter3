@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='pyhunter3',
     version='0.1.0',
-    description='A tool for testing web applications',
+    description='Web pentesting framework',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='mavedirra',
@@ -13,10 +13,11 @@ setup(
         'paramiko',
         'colorama',
         'requests',
+        'markdown',
     ],
     entry_points={
         'console_scripts': [
-            'pyhunter3=pyhunter3:main',
+            'pyhunter3=src.pyhunter3:main',
         ],
     },
     classifiers=[
@@ -26,3 +27,4 @@ setup(
     ],
     python_requires='>=3.6',
 )
+

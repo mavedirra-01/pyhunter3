@@ -1,0 +1,17 @@
+# Ignore the virtual environment directory
+/.venv
+
+# Ignore everything in the modules directory by default
+/modules/*
+
+# Allow tracking of .go files in the modules directory
+!/modules/**/*.go
+
+# Allow tracking of .go files in the main directory (if needed)
+!*.go
+
+/pyhunter3.egg-info
+/dist
+/build
+*.pyc
+__pycache__
